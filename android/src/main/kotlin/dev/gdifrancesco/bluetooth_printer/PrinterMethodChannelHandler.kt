@@ -17,7 +17,6 @@ import io.flutter.plugin.common.MethodChannel
 
 class PrinterMethodChannelHandler(private val context: Context) : MethodChannel.MethodCallHandler {
 
-
     private val TAG = "PrinterMethodHandler"
     private val btUtil: BluetoothUtil = BluetoothUtil()
 
@@ -30,7 +29,7 @@ class PrinterMethodChannelHandler(private val context: Context) : MethodChannel.
                 call.arguments as HashMap<String, Any>,
                 result
             )
-            "disconnectBluetooth" -> disconnectBluetooth(context)
+            "disconnectBluetooth" -> disconnectBluetooth(context, result)
             "printRawBytes" -> printRawBytes(call.arguments as HashMap<String, Any>, result)
             "sendData" -> sendData(context, call.arguments as HashMap<String, Any>, result)
             "printText" -> printText(call.arguments as HashMap<String, Any>, result)
@@ -93,15 +92,16 @@ class PrinterMethodChannelHandler(private val context: Context) : MethodChannel.
         result: MethodChannel.Result
     ) {
 
-        Log.i("SunmiPlugi", "printText");
+        Log.i("BluetoothPrinter", "sendData");
         val printMode = arguments["printMode"] as String
         val bytes = arguments["bytes"] as ByteArray
+        Log.i("BluetoothPrinter", "print mode$printMode");
         if (printMode == "bt") {
             try {
                 BluetoothUtil.sendData(bytes)
                 result.success(true)
             } catch (ex: Exception) {
-                Log.e("sunmi plugin", ex.toString())
+                Log.e("BluetoothPrinter", ex.toString())
                 result.error("121", ex.toString(), ex)
             }
         } else {
@@ -110,7 +110,7 @@ class PrinterMethodChannelHandler(private val context: Context) : MethodChannel.
     }
 
     private fun printText(arguments: Map<String, Any>, result: MethodChannel.Result) {
-        Log.i("SunmiPlugi", "printText");
+        Log.i("BluetoothPrinter", "printText");
         val printMode = arguments["printMode"] as String
         val text = arguments["text"] as String
         val charset = charset(sunmiCharsets[charsetIndex])
@@ -132,7 +132,7 @@ class PrinterMethodChannelHandler(private val context: Context) : MethodChannel.
                 BluetoothUtil.sendData(ESCUtil.nextLine(3))
 
             } catch (ex: Exception) {
-                Log.e("sunmi plugin", ex.toString())
+                Log.e("BluetoothPrinter", ex.toString())
                 result.error("121", ex.toString(), ex)
             }
         } else {
@@ -193,9 +193,10 @@ class PrinterMethodChannelHandler(private val context: Context) : MethodChannel.
         //result.success(BluetoothUtil.isBlueToothPrinter)
     }
 
-    private fun disconnectBluetooth(context: Context) {
+    private fun disconnectBluetooth(context: Context, result: MethodChannel.Result) {
         Log.i(TAG, "disconnectBluetooth");
         BluetoothUtil.disconnectBlueTooth(context)
+        result.success(true);
     }
 
     private fun startService(context: Context) {

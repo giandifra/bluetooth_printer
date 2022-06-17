@@ -159,7 +159,7 @@ public class BluetoothUtil {
                 e.printStackTrace();
             }
         } else {
-            //TODO handle disconnect event
+            Log.i("BluetoothPrint", "bluetoothSocket is null");
         }
     }
 

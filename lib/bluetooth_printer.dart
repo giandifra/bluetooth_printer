@@ -5,7 +5,7 @@ import 'package:flutter/services.dart';
 
 import 'bluetooth_device.dart';
 
-enum SunmiPrintMode { api, bt }
+enum PrintMode { api, bt }
 
 class BluetoothPrinter {
   static const MethodChannel _channel = MethodChannel('bluetooth_printer');
@@ -92,18 +92,18 @@ class BluetoothPrinter {
     await _channel.invokeMethod('disconnectBluetooth');
   }
 
-  static Future<void> sendData(Uint8List bytes, SunmiPrintMode printMode) async {
-    final map = <String, dynamic>{'bytes': bytes, 'printMode': printMode.toString().replaceFirst('SunmiPrintMode.', '')};
+  static Future<void> sendData(Uint8List bytes, PrintMode printMode) async {
+    final map = <String, dynamic>{'bytes': bytes, 'printMode': printMode.toString().replaceFirst('PrintMode.', '')};
     await _channel.invokeMethod(
       'sendData',
       map,
     );
   }
 
-  static Future<void> printText(String text, SunmiPrintMode printMode) async {
+  static Future<void> printText(String text, PrintMode printMode) async {
     final map = <String, dynamic>{
       'text': text,
-      'printMode': printMode.toString().replaceFirst('SunmiPrintMode.', '')
+      'printMode': printMode.toString().replaceFirst('PrintMode.', '')
     };
     await _channel.invokeMethod(
       'printText',

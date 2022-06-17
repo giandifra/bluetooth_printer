@@ -184,7 +184,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     final bytes = await testReceipt();
                     BluetoothPrinter.sendData(
                       bytes,
-                      SunmiPrintMode.bt,
+                      PrintMode.bt,
                     );
                   }
                       : null,
