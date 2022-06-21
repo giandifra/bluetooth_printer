@@ -8,6 +8,9 @@ import android.util.Log;
 
 import java.io.IOException;
 import java.io.OutputStream;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
@@ -24,6 +27,7 @@ public class BluetoothUtil {
     private static final String Innerprinter_Address = "00:11:22:33:44:55";
     public static boolean isBlueToothPrinter = false;
     private static BluetoothSocket bluetoothSocket;
+    private static final HashMap<BluetoothDevice, BluetoothSocket> socketMap = new HashMap();
 
     public static BluetoothAdapter getBTAdapter() {
         return BluetoothAdapter.getDefaultAdapter();
@@ -53,14 +57,26 @@ public class BluetoothUtil {
     private static BluetoothSocket getSocket(BluetoothDevice device) throws IOException {
         BluetoothSocket socket;
         socket = device.createRfcommSocketToServiceRecord(PRINTER_UUID);
+
         socket.connect();
         return socket;
+    }
+
+    public static String getConnectedDevice(String address) {
+        if (bluetoothSocket != null) {
+            String ad = bluetoothSocket.getRemoteDevice().getAddress();
+            Log.i(TAG, "address from socket " + ad);
+            return ad;
+        }
+        Log.i(TAG, "device address not connected socket " + address);
+        return null;
     }
 
     /**
      * connect bluetooth
      */
     public static boolean connectBlueTooth(Context context, String deviceAddress) {
+        Log.i(TAG, "connecting to address " + deviceAddress);
         if (bluetoothSocket == null) {
             if (getBTAdapter() == null) {
                 //Toast.makeText(context,  R.string.toast_3, Toast.LENGTH_SHORT).show();
@@ -91,16 +107,17 @@ public class BluetoothUtil {
         return true;
     }
 
-    public static boolean connect(BluetoothDevice device) {
-        try {
-            bluetoothSocket = getSocket(device);
-            return true;
-        } catch (IOException e) {
-            //Toast.makeText(context, R.string.toast_6, Toast.LENGTH_SHORT).show();
-            e.printStackTrace();
-            return false;
+    /*
+        public static boolean connect(BluetoothDevice device) {
+            try {
+                bluetoothSocket = getSocket(device);
+                return true;
+            } catch (IOException e) {
+                //Toast.makeText(context, R.string.toast_6, Toast.LENGTH_SHORT).show();
+                e.printStackTrace();
+                return false;
+            }
         }
-    }
 
     public boolean connect(String address) {
         Log.i(TAG, "connecting to address " + address);
@@ -121,7 +138,7 @@ public class BluetoothUtil {
             return false;
         }
     }
-
+*/
     private boolean disconnect() {
         Log.i(TAG, "disconnect");
         if (DeviceConnFactoryManager.getDeviceConnFactoryManagers()[id] != null && DeviceConnFactoryManager.getDeviceConnFactoryManagers()[id].mPort != null) {

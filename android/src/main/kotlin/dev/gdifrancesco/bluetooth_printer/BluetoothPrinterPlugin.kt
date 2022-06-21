@@ -21,21 +21,21 @@ class BluetoothPrinterPlugin : FlutterPlugin, ActivityAware {
   private lateinit var eventChannel: EventChannel
   private lateinit var context: Context
   private lateinit var activity: Activity
-  private val bluetoothEventChannel = "bluetoothStream"
+  private val bluetoothEventChannel = "bluetooth_stream"
   override fun onAttachedToEngine(@NonNull flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
     context = flutterPluginBinding.applicationContext
 
     methodChannel = MethodChannel(flutterPluginBinding.binaryMessenger, "bluetooth_printer")
-    methodChannel.setMethodCallHandler(PrinterMethodChannelHandler(context))
+    methodChannel.setMethodCallHandler(PrinterMethodChannelHandler(context));
 
-    //eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, bluetoothEventChannel)
-    //eventChannel.setStreamHandler(BluetoothStreamHandler(context));
+    eventChannel = EventChannel(flutterPluginBinding.binaryMessenger, bluetoothEventChannel)
+    eventChannel.setStreamHandler(BluetoothStreamHandler(context));
 
   }
 
   override fun onDetachedFromEngine(@NonNull binding: FlutterPlugin.FlutterPluginBinding) {
     methodChannel.setMethodCallHandler(null)
-    //eventChannel.setStreamHandler(null)
+    eventChannel.setStreamHandler(null)
   }
 
 

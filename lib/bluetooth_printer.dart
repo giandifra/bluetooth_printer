@@ -4,15 +4,16 @@ import 'dart:typed_data';
 import 'package:flutter/services.dart';
 
 import 'bluetooth_device.dart';
+import 'bluetooth_status.dart';
 
 enum PrintMode { api, bt }
 
 class BluetoothPrinter {
   static const MethodChannel _channel = MethodChannel('bluetooth_printer');
-  static const EventChannel _eventChannel = EventChannel('bluetoothStream');
+  static const EventChannel _eventChannel = EventChannel('bluetooth_stream');
 
-  Stream<BluetoothDevice>? _bluetoothStream;
-  StreamSubscription<BluetoothDevice>? _sub;
+  Stream<BluetoothStream>? _bluetoothStream;
+  StreamSubscription<Map<String, dynamic>>? _sub;
 
   /// Constructs a singleton instance of [Connectivity].
   ///
@@ -29,29 +30,58 @@ class BluetoothPrinter {
 
   static BluetoothPrinter? _singleton;
 
-  Stream<BluetoothDevice> get scanResults {
-    _bluetoothStream ??= _eventChannel.receiveBroadcastStream().timeout(
-        const Duration(seconds: 10), onTimeout: (s) {
-      print("timeout stream");
-      s.close();
-    }).map(
-            (event) => BluetoothDevice.fromJson(Map<String, dynamic>.from(event)));
+  Stream<BluetoothStream> get bluetoothStatusStream {
+    _bluetoothStream ??= _eventChannel
+        .receiveBroadcastStream()
+        //     .timeout(const Duration(seconds: 10), onTimeout: (s) {
+        //   print("timeout stream");
+        //   s.close();
+        // })
+        .map((event) =>
+            BluetoothStream.fromJson(Map<String, dynamic>.from(event)));
     // _sub ??= _bluetoothStream?.listen((event) { });
     return _bluetoothStream!;
   }
+
+  Stream<BluetoothStream> status() async* {
+    await for (final status in bluetoothStatusStream) {
+      print('new status => $status');
+      yield status;
+    }
+  }
+
+  Stream<BluetoothState> state() async* {
+    await for (final status in bluetoothStatusStream) {
+      if (status.action == BluetoothAction.stateChanged) {
+        print('BluetoothState => ${status.state}');
+        yield status.state;
+      }
+    }
+  }
+
+  // Stream<BluetoothDevice> get scanResults {
+  //   _bluetoothStream ??= _eventChannel.receiveBroadcastStream().timeout(
+  //       const Duration(seconds: 10), onTimeout: (s) {
+  //     print("timeout stream");
+  //     s.close();
+  //   }).map(
+  //           (event) => BluetoothDevice.fromJson(Map<String, dynamic>.from(event)));
+  //   // _sub ??= _bluetoothStream?.listen((event) { });
+  //   return _bluetoothStream!;
+  // }
 
   // close(){
   //   _sub?.cancel();
   // }
 
-  Stream<List<BluetoothDevice>> devices() async* {
-    final list = <BluetoothDevice>{};
-    await for (final device in scanResults) {
-      print('new d ${device.name}');
-      list.add(device);
-      yield list.toList();
-    }
-  }
+  // Stream<List<BluetoothDevice>> devices() async* {
+  //   final list = <BluetoothDevice>{};
+  //   await for (final device in scanResults) {
+  //     print('new d ${device.name}');
+  //     list.add(device);
+  //     yield list.toList();
+  //   }
+  // }
 
   static Future<bool> connect(BluetoothDevice device) async {
     return await _channel.invokeMethod('connect', device.toJson()) as bool;
@@ -59,7 +89,7 @@ class BluetoothPrinter {
 
   static Future<bool> printRawBytes(Uint8List bytes) async {
     return await _channel.invokeMethod('printRawBytes', {'bytes': bytes})
-    as bool;
+        as bool;
   }
 
   static Future<String?> get platformVersion async {
@@ -75,6 +105,12 @@ class BluetoothPrinter {
     await _channel.invokeMethod('stopService');
   }
 
+  static Future<String?> getConnectedDevice(String? address) async {
+    final result =
+        await _channel.invokeMethod('getConnectedDevice', {'address': address});
+    return result;
+  }
+
   static Future<List<BluetoothDevice>> getBondedDevices() async {
     final result = await _channel.invokeMethod('getBondedDevices');
     return List.from(result)
@@ -82,10 +118,44 @@ class BluetoothPrinter {
         .toList();
   }
 
-  static Future<bool> connectBluetooth({String? address}) async {
-    final result =
-    await _channel.invokeMethod('connectBluetooth', {'address': address});
-    return result;
+  Future<bool> connectBluetooth({String? address}) async {
+    final connectedAddress = await BluetoothPrinter.getConnectedDevice(address);
+    final isConnected = connectedAddress != null && connectedAddress == address;
+    if (!isConnected) {
+      final completer = Completer<bool>();
+      late StreamSubscription<BluetoothStream> subscription;
+      subscription = bluetoothStatusStream.listen((status) {
+        if (status.action == BluetoothAction.connected) {
+          if (status.device != null && status.device == address) {
+            subscription.cancel();
+            completer.complete(true);
+          }
+        }
+      });
+      // for (final status in bluetoothStatusStream) {
+      //   if (status.action == BluetoothAction.connected) {
+      //     if (status.device != null && status.device == address) {
+      //       completer.complete(true);
+      //     }
+      //   }
+      // }
+      if(connectedAddress != null){
+        disconnectBluetooth();
+      }
+      _channel.invokeMethod('connectBluetooth', {'address': address});
+
+/*    Future.timeout(Duration(seconds: 10), onTimeout: () {
+      completer.completeError('timeout');
+    });
+    Future.wait<bool>[
+    ].then((data) {
+      print(data);
+    }).timeout(Duration(seconds: 10));*/
+      print('return completer');
+      return completer.future;
+    }
+    print('already connected');
+    return true;
   }
 
   static Future<void> disconnectBluetooth() async {
@@ -93,7 +163,10 @@ class BluetoothPrinter {
   }
 
   static Future<void> sendData(Uint8List bytes, PrintMode printMode) async {
-    final map = <String, dynamic>{'bytes': bytes, 'printMode': printMode.toString().replaceFirst('PrintMode.', '')};
+    final map = <String, dynamic>{
+      'bytes': bytes,
+      'printMode': printMode.toString().replaceFirst('PrintMode.', '')
+    };
     await _channel.invokeMethod(
       'sendData',
       map,
