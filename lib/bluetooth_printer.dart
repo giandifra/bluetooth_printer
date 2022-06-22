@@ -87,10 +87,10 @@ class BluetoothPrinter {
     return await _channel.invokeMethod('connect', device.toJson()) as bool;
   }
 
-  static Future<bool> printRawBytes(Uint8List bytes) async {
+/*  static Future<bool> printRawBytes(Uint8List bytes) async {
     return await _channel.invokeMethod('printRawBytes', {'bytes': bytes})
         as bool;
-  }
+  }*/
 
   static Future<String?> get platformVersion async {
     final String? version = await _channel.invokeMethod('getPlatformVersion');
@@ -105,10 +105,9 @@ class BluetoothPrinter {
     await _channel.invokeMethod('stopService');
   }
 
-  static Future<String?> getConnectedDevice(String? address) async {
-    final result =
-        await _channel.invokeMethod('getConnectedDevice', {'address': address});
-    return result;
+  static Future<List<String>> getConnectedDevices() async {
+    final result = await _channel.invokeMethod('getConnectedDevices');
+    return List<String>.from(result);
   }
 
   static Future<List<BluetoothDevice>> getBondedDevices() async {
@@ -118,15 +117,23 @@ class BluetoothPrinter {
         .toList();
   }
 
+  Future<bool> isConnected(String address) async {
+    final res =
+        await _channel.invokeMethod('isConnected', {'address': address});
+    return res;
+  }
+
   Future<bool> connectBluetooth({String? address}) async {
-    final connectedAddress = await BluetoothPrinter.getConnectedDevice(address);
-    final isConnected = connectedAddress != null && connectedAddress == address;
+    final connectedAddresses = await BluetoothPrinter.getConnectedDevices();
+    final isConnected = connectedAddresses.contains(address);
     if (!isConnected) {
+      print('printer $address is not connected');
       final completer = Completer<bool>();
       late StreamSubscription<BluetoothStream> subscription;
       subscription = bluetoothStatusStream.listen((status) {
         if (status.action == BluetoothAction.connected) {
           if (status.device != null && status.device == address) {
+            print('printer $address now Connected');
             subscription.cancel();
             completer.complete(true);
           }
@@ -139,9 +146,9 @@ class BluetoothPrinter {
       //     }
       //   }
       // }
-      if(connectedAddress != null){
-        disconnectBluetooth();
-      }
+      // if (connectedAddresses != null) {
+      //   disconnectBluetooth();
+      // }
       _channel.invokeMethod('connectBluetooth', {'address': address});
 
 /*    Future.timeout(Duration(seconds: 10), onTimeout: () {
@@ -158,14 +165,18 @@ class BluetoothPrinter {
     return true;
   }
 
-  static Future<void> disconnectBluetooth() async {
-    await _channel.invokeMethod('disconnectBluetooth');
+  static Future<bool> disconnectBluetooth(String address) async {
+    final res = await _channel
+        .invokeMethod('disconnectBluetooth', {'address': address});
+    return res as bool;
   }
 
-  static Future<void> sendData(Uint8List bytes, PrintMode printMode) async {
+  static Future<void> sendData(
+      Uint8List bytes, PrintMode printMode, String address) async {
     final map = <String, dynamic>{
       'bytes': bytes,
-      'printMode': printMode.toString().replaceFirst('PrintMode.', '')
+      'printMode': printMode.toString().replaceFirst('PrintMode.', ''),
+      'address': address
     };
     await _channel.invokeMethod(
       'sendData',
@@ -173,7 +184,7 @@ class BluetoothPrinter {
     );
   }
 
-  static Future<void> printText(String text, PrintMode printMode) async {
+/*  static Future<void> printText(String text, PrintMode printMode) async {
     final map = <String, dynamic>{
       'text': text,
       'printMode': printMode.toString().replaceFirst('PrintMode.', '')
@@ -182,7 +193,7 @@ class BluetoothPrinter {
       'printText',
       map,
     );
-  }
+  }*/
 
   static Future<void> setCharset(String charset) async {
     await _channel.invokeMethod(

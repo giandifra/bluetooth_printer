@@ -1,5 +1,8 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
     package="dev.gdifrancesco.bluetooth_printer_example">
+
+    <uses-permission android:name="android.permission.INTERNET" />
+
    <application
         android:label="bluetooth_printer_example"
         android:name="${applicationName}"

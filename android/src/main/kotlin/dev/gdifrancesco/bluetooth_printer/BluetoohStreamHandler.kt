@@ -113,13 +113,14 @@ class BluetoothStreamHandler(private val context: Context) : EventChannel.Stream
                 else -> Log.i(TAG, "unmanaged action $action")
             }
             if (ret.isNotEmpty()) {
-                Log.i(TAG, ret.toString())
+                //Log.i(TAG, ret.toString())
                 val runnable = Runnable { events!!.success(ret) }
                 mainHandler.post(runnable)
             }
         }
     }
 
+/*
     @Throws(IllegalStateException::class)
     private fun startScan() {
         Log.i(TAG, "startScan")
@@ -131,6 +132,7 @@ class BluetoothStreamHandler(private val context: Context) : EventChannel.Stream
             ScanSettings.Builder().setScanMode(ScanSettings.SCAN_MODE_LOW_LATENCY).build()
         scanner.startScan(null, settings, mScanCallback)
     }
+
 
     private fun sendNewDevice(device: BluetoothDevice) {
         Log.i(TAG, "sendNewDevice")
@@ -158,4 +160,5 @@ class BluetoothStreamHandler(private val context: Context) : EventChannel.Stream
             }
         }
     }
+    */
 }

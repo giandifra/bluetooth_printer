@@ -82,6 +82,10 @@ class _HomeScreenState extends State<HomeScreen> {
   bool permissionIsGranted = false;
   String? selectedCharSet;
   bool connected = false;
+  var connectedDevices = <String>[];
+
+  int delay = 2;
+  int copies = 1;
 
   @override
   Widget build(BuildContext context) {
@@ -118,7 +122,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   stream: BluetoothPrinter().state(),
                   builder: (c, snap) {
                     if (!snap.hasData) {
-                      return SizedBox();
+                      return const SizedBox();
                     }
                     final state = snap.data!;
                     return Container(
@@ -139,12 +143,12 @@ class _HomeScreenState extends State<HomeScreen> {
                   stream: BluetoothPrinter().status(),
                   builder: (c, snap) {
                     if (!snap.hasData) {
-                      return SizedBox();
+                      return const SizedBox();
                     }
                     final action = snap.data!.action;
                     final state = snap.data!.state;
                     final connectionState = snap.data!.connectionState;
-                    final address = snap.data!.action;
+                    final address = snap.data!.device;
                     return Container(
                       child: Column(
                         mainAxisSize: MainAxisSize.min,
@@ -202,7 +206,44 @@ class _HomeScreenState extends State<HomeScreen> {
                           }
                         }
                       : null,
-                  child: const Text('Scan bonded devices')),
+                  child: const Text('Scan and select device to connect')),
+              ElevatedButton(
+                  onPressed: () async {
+                    final res = await BluetoothPrinter.getConnectedDevices();
+                    setState(() {
+                      connectedDevices = res;
+                    });
+                  },
+                  child: const Text('get connected devices')),
+              if (connectedDevices.isNotEmpty) ...[
+                const Text('Connected device'),
+                ...connectedDevices.map(
+                  (e) => ListTile(
+                    title: Text(e),
+                    trailing: IconButton(
+                        icon: const Icon(Icons.delete),
+                        color: Colors.red,
+                        onPressed: () async {
+                          disconnectDevice(e);
+                        }),
+                  ),
+                )
+              ],
+              ElevatedButton(
+                  onPressed: permissionIsGranted && selectedDevice != null
+                      ? () async {
+                          final r = await BluetoothPrinter().connectBluetooth(
+                              address: selectedDevice?.address);
+                          print('bluetooth connection : $r');
+                          final res =
+                              await BluetoothPrinter.getConnectedDevices();
+                          setState(() {
+                            connectedDevices = res;
+                            connected = r;
+                          });
+                        }
+                      : null,
+                  child: const Text('connectBluetooth')),
               if (selectedDevice != null)
                 Container(
                   child: Column(
@@ -215,29 +256,94 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ),
               ElevatedButton(
-                  onPressed: permissionIsGranted && selectedDevice != null
+                  onPressed: permissionIsGranted
                       ? () async {
-                          final r = await BluetoothPrinter().connectBluetooth(
-                              address: selectedDevice?.address);
-                          print('bluetooth connection : $r');
-                          setState(() {
-                            connected = r;
-                          });
+                          if (selectedDevice == null) return;
+                          try {
+                            final bytes = await testReceipt();
+                            final connected = await BluetoothPrinter()
+                                .connectBluetooth(
+                                    address: selectedDevice!.address);
+                            if (!connected) return;
+                            BluetoothPrinter.sendData(
+                              bytes,
+                              PrintMode.bt,
+                              selectedDevice!.address,
+                            ).then((value) async {
+                              await Future.delayed(Duration(seconds: delay));
+                              disconnectDevice(selectedDevice!.address);
+                            });
+                          } catch (ex) {
+                            showToast(ex.toString(),
+                                position: ToastPosition.bottom);
+                          }
                         }
                       : null,
-                  child: const Text('connectBluetooth')),
+                  child: const Text('Connect and print')),
               ElevatedButton(
-                  onPressed: permissionIsGranted && connected
+                  onPressed: permissionIsGranted && connectedDevices.isNotEmpty
                       ? () async {
-                          final bytes = await testReceipt();
-                          BluetoothPrinter.sendData(
-                            bytes,
-                            PrintMode.bt,
-                          );
+                          try {
+                            final bytes = await testReceipt();
+                            connectedDevices.forEach((address) async {
+                              // for (int i = 0; i < 3; i++) {
+                              BluetoothPrinter.sendData(
+                                bytes,
+                                PrintMode.bt,
+                                address,
+                              ).then((value) async {
+                                print('data sent');
+                                await Future.delayed(Duration(seconds: delay));
+                                disconnectDevice(address);
+                              });
+                              // await Future.delayed(
+                              //     const Duration(milliseconds: 1000));
+                              // await disconnectDevice(address);
+                              print(
+                                  '------------------------------------------');
+                              // }
+                            });
+                          } catch (ex) {
+                            showToast(ex.toString(),
+                                position: ToastPosition.bottom);
+                          }
                         }
                       : null,
                   child: const Text('print text with BT')),
-              ElevatedButton(
+              Row(
+                children: [
+                  IconButton(
+                      icon: Icon(Icons.remove),
+                      color: Colors.red,
+                      onPressed: () {
+                        if (delay == 1) return;
+                        setState(() {
+                          delay--;
+                        });
+                      }),
+                  Text('delay: ${delay}'),
+                  IconButton(
+                      icon: Icon(Icons.add),
+                      color: Colors.blue,
+                      onPressed: () {
+                        setState(() {
+                          delay++;
+                        });
+                      }),
+                ],
+              ),
+              TextFormField(
+                keyboardType: TextInputType.number,
+                decoration: InputDecoration(hintText: 'numero di copie'),
+                onChanged: (v) {
+                  final n = int.tryParse(v);
+                  if (n == null) return;
+                  setState(() {
+                    copies = n;
+                  });
+                },
+              )
+              /*ElevatedButton(
                   onPressed:
                       permissionIsGranted && selectedDevice != null && connected
                           ? () async {
@@ -248,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               });
                             }
                           : null,
-                  child: const Text('disconnectBluetooth')),
+                  child: const Text('disconnectBluetooth')),*/
               // if (permissionIsGranted)
               //   ElevatedButton(
               //       onPressed: () async {
@@ -315,24 +421,32 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  testReceipt() async {
+  disconnectDevice(String address) async {
+    final res = await BluetoothPrinter.disconnectBluetooth(address);
+    if (res) {
+      final devices = await BluetoothPrinter.getConnectedDevices();
+      setState(() {
+        connectedDevices = devices;
+      });
+    }
+  }
+
+  Future<Uint8List> testReceipt() async {
     try {
-      const testReceiptEndpoint =
+      final testReceiptEndpoint =
           // "https://b1a8-213-86-221-106.ngrok.io/v1/Receipt/testReceipt";
-          "https://api.biz.test.chivado.com/v1/Receipt/testReceipt";
+          "https://api.biz.test.chivado.com/v1/Receipt/testReceipt/$copies";
 
       final dio = Dio();
       final res = await dio.get(testReceiptEndpoint,
           options: Options(responseType: ResponseType.bytes));
       if (res.statusCode == 200) {
         print(res.data);
-        // return res.data;
         return Uint8List.fromList(res.data);
       }
-
       throw Exception();
     } catch (ex) {
-      return Uint8List(0);
+      rethrow;
     }
   }
 }

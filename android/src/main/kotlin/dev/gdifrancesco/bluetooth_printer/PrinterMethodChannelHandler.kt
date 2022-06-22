@@ -1,9 +1,6 @@
 package dev.gdifrancesco.bluetooth_printer
 
-import android.app.Application
 import android.bluetooth.BluetoothDevice
-import android.bluetooth.BluetoothManager
-import android.bluetooth.BluetoothProfile
 import android.bluetooth.le.ScanCallback
 import android.bluetooth.le.ScanResult
 import android.content.Context
@@ -11,7 +8,6 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import dev.gdifrancesco.bluetooth_printer.utils.BluetoothUtil
-import dev.gdifrancesco.bluetooth_printer.utils.ESCUtil
 import dev.gdifrancesco.bluetooth_printer.utils.SunmiPrintHelper
 import io.flutter.plugin.common.MethodCall
 import io.flutter.plugin.common.MethodChannel
@@ -22,7 +18,7 @@ class PrinterMethodChannelHandler(
     private val context: Context
 ) : MethodChannel.MethodCallHandler {
 
-    private val btManager = BluetoothController(context)
+    private val btController = BluetoothController2(context)
     private val TAG = "PrinterMethodHandler"
     private val btUtil: BluetoothUtil = BluetoothUtil()
 
@@ -31,19 +27,20 @@ class PrinterMethodChannelHandler(
             "getPlatformVersion" -> result.success("Android ${android.os.Build.VERSION.RELEASE}")
             "getBondedDevices" -> getBondedDevices(context, result)
             "connectBluetooth" -> connectBluetooth(
-                context,
                 call.arguments as HashMap<String, Any>,
                 result
             )
-            "disconnectBluetooth" -> disconnectBluetooth(context, result)
-            "printRawBytes" -> printRawBytes(call.arguments as HashMap<String, Any>, result)
-            "sendData" -> sendData(context, call.arguments as HashMap<String, Any>, result)
-            "printText" -> printText(call.arguments as HashMap<String, Any>, result)
-            "getConnectedDevice" -> getConnectedDevice(
-                context,
+            "disconnectBluetooth" -> disconnectBluetooth(
                 call.arguments as HashMap<String, Any>,
                 result
             )
+            //"printRawBytes" -> printRawBytes(call.arguments as HashMap<String, Any>, result)
+            "sendData" -> sendData(call.arguments as HashMap<String, Any>, result)
+            //"printText" -> printText(call.arguments as HashMap<String, Any>, result)
+            "getConnectedDevices" -> getConnectedDevices(
+                result
+            )
+            "isConnected" -> isConnected(call.arguments as HashMap<String, Any>, result)
             "startService" -> startService(context)
             "stopService" -> stopService(context)
             //"connect" -> connect(call.arguments as HashMap<String, Any>, result)
@@ -98,31 +95,41 @@ class PrinterMethodChannelHandler(
     }
 
     private fun sendData(
-        context: Context,
         arguments: Map<String, Any>,
         result: MethodChannel.Result
     ) {
-
-        Log.i("BluetoothPrinter", "sendData");
-        val printMode = arguments["printMode"] as String
-        val bytes = arguments["bytes"] as ByteArray
-        Log.i("BluetoothPrinter", "print mode$printMode");
-        if (printMode == "bt") {
-            try {
+        try {
+            Log.i("BluetoothPrinter", "sendData");
+            val address = arguments["address"] as String
+            val printMode = arguments["printMode"] as String
+            val bytes = arguments["bytes"] as ByteArray
+            Log.i("BluetoothPrinter", "print mode$printMode");
+            if (printMode == "bt") {
                 Log.i("BluetoothPrinter", bytes.size.toString());
-                System.out.println(Arrays.toString(bytes));
-                BluetoothUtil.sendData(bytes)
-                result.success(true)
-            } catch (ex: Exception) {
-                Log.e("BluetoothPrinter", ex.toString())
-                result.error("121", ex.toString(), ex)
+                //System.out.println(Arrays.toString(bytes));
+
+                //bt
+                //val res = btController.sendData(bytes, address);
+                //result.success(res)
+
+                //bt2
+                btController.sendData(bytes, address) { res, ex ->
+                    if (ex != null) {
+                        result.error("121", ex.toString(), ex)
+                        return@sendData
+                    }
+                    result.success(res)
+                }
+
+            } else {
+                SunmiPrintHelper.getInstance().sendRawData(bytes);
             }
-        } else {
-            SunmiPrintHelper.getInstance().sendRawData(bytes);
+        } catch (ex: Exception) {
+            result.error("sendata", ex.message, ex)
         }
     }
 
-    private fun printText(arguments: Map<String, Any>, result: MethodChannel.Result) {
+    /*private fun printText(arguments: Map<String, Any>, result: MethodChannel.Result) {
         Log.i("BluetoothPrinter", "printText");
         val printMode = arguments["printMode"] as String
         val text = arguments["text"] as String
@@ -151,7 +158,7 @@ class PrinterMethodChannelHandler(
         } else {
             SunmiPrintHelper.getInstance().sendRawData(bytes);
         }
-    }
+    }*/
 
     private fun codeParse(value: Int): Byte {
         var res: Byte = 0x00
@@ -175,7 +182,7 @@ class PrinterMethodChannelHandler(
     private fun getBondedDevices(context: Context, result: MethodChannel.Result) {
         Log.i(TAG, "getBondedDevices");
 
-        val devices: Set<BluetoothDevice> = BluetoothUtil.getBTAdapter().bondedDevices
+        val devices: Set<BluetoothDevice> = btController.getBondedDevice()
         result.success(devices.map { it ->
             mapOf(
                 "address" to it.address,
@@ -186,16 +193,22 @@ class PrinterMethodChannelHandler(
 
     }
 
-    private fun getConnectedDevice(
-        context: Context,
+    private fun isConnected(
         arguments: Map<String, Any>,
+        result: MethodChannel.Result
+    ) {
+        val address = arguments["address"] as String
+        result.success(btController.isConnected(address))
+    }
+
+    private fun getConnectedDevices(
         result: MethodChannel.Result
     ) {
         Log.i(TAG, "getConnectedDevice");
 
         try {
-            val address = arguments["address"] as String
-/*
+
+/* val address = arguments["address"] as String
             val application = context.applicationContext as Application
             val manager: BluetoothManager =
                 application.getSystemService(Context.BLUETOOTH_SERVICE) as BluetoothManager
@@ -212,7 +225,7 @@ class PrinterMethodChannelHandler(
             //}
 
  */
-            result.success(BluetoothUtil.getConnectedDevice(address))
+            result.success(btController.getConnectedDevices())
         } catch (ex: Exception) {
             result.error(ex.toString(), "", "")
         }
@@ -220,15 +233,15 @@ class PrinterMethodChannelHandler(
     }
 
     private fun connectBluetooth(
-        context: Context,
         arguments: Map<String, Any>,
         result: MethodChannel.Result
     ) {
         try {
             Log.i(TAG, "connectBluetooth");
             val address = arguments["address"] as String
-            BluetoothUtil.isBlueToothPrinter = BluetoothUtil.connectBlueTooth(context, address)
-            result.success(BluetoothUtil.isBlueToothPrinter)
+            btController.connectBlueTooth(address) { res, ex ->
+                result.success(res)
+            }
         } catch (ex: Exception) {
             Log.i(TAG, ex.toString());
             result.error(ex.toString(), ex.message, ex)
@@ -245,10 +258,13 @@ class PrinterMethodChannelHandler(
             //result.success(BluetoothUtil.isBlueToothPrinter)
         }
     */
-    private fun disconnectBluetooth(context: Context, result: MethodChannel.Result) {
+    private fun disconnectBluetooth(
+        arguments: Map<String, Any>,
+        result: MethodChannel.Result
+    ) {
         Log.i(TAG, "disconnectBluetooth");
-        BluetoothUtil.disconnectBlueTooth(context)
-        result.success(true);
+        val address = arguments["address"] as String
+        result.success(btController.disconnectBlueTooth(address));
     }
 
     private fun startService(context: Context) {
