@@ -18,7 +18,7 @@ class PrinterMethodChannelHandler(
     private val context: Context
 ) : MethodChannel.MethodCallHandler {
 
-    private val btController = BluetoothController2(context)
+    private val btController = BluetoothController(context)
     private val TAG = "PrinterMethodHandler"
     private val btUtil: BluetoothUtil = BluetoothUtil()
 
@@ -109,17 +109,17 @@ class PrinterMethodChannelHandler(
                 //System.out.println(Arrays.toString(bytes));
 
                 //bt
-                //val res = btController.sendData(bytes, address);
-                //result.success(res)
+                val r = btController.sendData(bytes, address);
+                result.success(r)
 
                 //bt2
-                btController.sendData(bytes, address) { res, ex ->
+                /*btController.sendData(bytes, address) { res, ex ->
                     if (ex != null) {
                         result.error("121", ex.toString(), ex)
                         return@sendData
                     }
                     result.success(res)
-                }
+                }*/
 
             } else {
                 SunmiPrintHelper.getInstance().sendRawData(bytes);
@@ -239,9 +239,14 @@ class PrinterMethodChannelHandler(
         try {
             Log.i(TAG, "connectBluetooth");
             val address = arguments["address"] as String
-            btController.connectBlueTooth(address) { res, ex ->
-                result.success(res)
-            }
+
+            val r = btController.connectBlueTooth(address);
+            result.success(r)
+
+            //bt2
+            /*btController.connectBlueTooth(address) { res, ex ->
+                    result.success(res)
+                }*/
         } catch (ex: Exception) {
             Log.i(TAG, ex.toString());
             result.error(ex.toString(), ex.message, ex)

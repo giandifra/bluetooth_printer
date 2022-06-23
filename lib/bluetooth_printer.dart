@@ -33,12 +33,12 @@ class BluetoothPrinter {
   Stream<BluetoothStream> get bluetoothStatusStream {
     _bluetoothStream ??= _eventChannel
         .receiveBroadcastStream()
-        //     .timeout(const Duration(seconds: 10), onTimeout: (s) {
-        //   print("timeout stream");
-        //   s.close();
-        // })
+    //     .timeout(const Duration(seconds: 10), onTimeout: (s) {
+    //   print("timeout stream");
+    //   s.close();
+    // })
         .map((event) =>
-            BluetoothStream.fromJson(Map<String, dynamic>.from(event)));
+        BluetoothStream.fromJson(Map<String, dynamic>.from(event)));
     // _sub ??= _bluetoothStream?.listen((event) { });
     return _bluetoothStream!;
   }
@@ -119,50 +119,45 @@ class BluetoothPrinter {
 
   Future<bool> isConnected(String address) async {
     final res =
-        await _channel.invokeMethod('isConnected', {'address': address});
+    await _channel.invokeMethod('isConnected', {'address': address});
     return res;
   }
 
   Future<bool> connectBluetooth({String? address}) async {
-    final connectedAddresses = await BluetoothPrinter.getConnectedDevices();
-    final isConnected = connectedAddresses.contains(address);
-    if (!isConnected) {
-      print('printer $address is not connected');
-      final completer = Completer<bool>();
-      late StreamSubscription<BluetoothStream> subscription;
-      subscription = bluetoothStatusStream.listen((status) {
-        if (status.action == BluetoothAction.connected) {
-          if (status.device != null && status.device == address) {
-            print('printer $address now Connected');
-            subscription.cancel();
-            completer.complete(true);
+    StreamSubscription<BluetoothStream>? subscription;
+    try {
+      final connectedAddresses = await BluetoothPrinter.getConnectedDevices();
+      final isConnected = connectedAddresses.contains(address);
+      if (!isConnected) {
+        print('printer $address is not connected');
+        final completer = Completer<bool>();
+        subscription = bluetoothStatusStream.listen((status) {
+          if (status.action == BluetoothAction.connected) {
+            if (status.device != null && status.device == address) {
+              print('printer $address now Connected');
+              subscription?.cancel();
+              completer.complete(true);
+            }
           }
-        }
-      });
-      // for (final status in bluetoothStatusStream) {
-      //   if (status.action == BluetoothAction.connected) {
-      //     if (status.device != null && status.device == address) {
-      //       completer.complete(true);
-      //     }
-      //   }
-      // }
-      // if (connectedAddresses != null) {
-      //   disconnectBluetooth();
-      // }
-      _channel.invokeMethod('connectBluetooth', {'address': address});
-
-/*    Future.timeout(Duration(seconds: 10), onTimeout: () {
-      completer.completeError('timeout');
-    });
-    Future.wait<bool>[
-    ].then((data) {
-      print(data);
-    }).timeout(Duration(seconds: 10));*/
-      print('return completer');
-      return completer.future;
+        });
+        _channel.invokeMethod('connectBluetooth', {'address': address}).then((
+            isConnected) {
+          print('connected: $isConnected');
+        }).onError((error, stackTrace) {
+          if (!completer.isCompleted) {
+            completer.complete(false);
+          }
+        });
+        print('return completer');
+        return completer.future;
+      }
+      print('already connected');
+      return true;
+    } catch (ex) {
+      subscription?.cancel();
+      print('no connected');
+      return false;
     }
-    print('already connected');
-    return true;
   }
 
   static Future<bool> disconnectBluetooth(String address) async {
@@ -171,8 +166,8 @@ class BluetoothPrinter {
     return res as bool;
   }
 
-  static Future<void> sendData(
-      Uint8List bytes, PrintMode printMode, String address) async {
+  static Future<void> sendData(Uint8List bytes, PrintMode printMode,
+      String address) async {
     final map = <String, dynamic>{
       'bytes': bytes,
       'printMode': printMode.toString().replaceFirst('PrintMode.', ''),

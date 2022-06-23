@@ -34,18 +34,18 @@ class BluetoothController(private val context: Context) {
         try {
 
             bluetoothManager.adapter.cancelDiscovery();
-           /* if (Build.VERSION.SDK_INT >= 10) {
-                try {
-                    val m: Method = device.javaClass.getMethod(
-                        "createInsecureRfcommSocketToServiceRecord", arrayOf<Class<*>>(
-                            UUID::class.java
-                        )
-                    )
-                    return (m.invoke(device, mMyUuid) as BluetoothSocket)
-                } catch (e: java.lang.Exception) {
-                    Log.e(TAG, "Could not create Insecure RFComm Connection", e)
-                }
-            }*/
+            /* if (Build.VERSION.SDK_INT >= 10) {
+                 try {
+                     val m: Method = device.javaClass.getMethod(
+                         "createInsecureRfcommSocketToServiceRecord", arrayOf<Class<*>>(
+                             UUID::class.java
+                         )
+                     )
+                     return (m.invoke(device, mMyUuid) as BluetoothSocket)
+                 } catch (e: java.lang.Exception) {
+                     Log.e(TAG, "Could not create Insecure RFComm Connection", e)
+                 }
+             }*/
 
 
             //val uuid = device.uuids[0].uuid;
@@ -53,7 +53,7 @@ class BluetoothController(private val context: Context) {
             //    device.createRfcommSocketToServiceRecord(uuid)
 
             val socket: BluetoothSocket =
-               device.createRfcommSocketToServiceRecord(PRINTER_UUID)
+                device.createRfcommSocketToServiceRecord(PRINTER_UUID)
             Log.i(TAG, "socket is already connected? : ${socket.isConnected}")
             socket.connect()
             return socket
@@ -63,7 +63,7 @@ class BluetoothController(private val context: Context) {
             Log.e(TAG, e.message!!)
             try {
                 Log.e("", "trying fallback...")
-                val socket :BluetoothSocket= device.javaClass.getMethod(
+                val socket: BluetoothSocket = device.javaClass.getMethod(
                     "createRfcommSocket",
                     Int::class.javaPrimitiveType
                 ).invoke(device, 2) as BluetoothSocket
@@ -133,12 +133,12 @@ class BluetoothController(private val context: Context) {
                 return false
             }
             try {
-                val socket = getSocket(device) ?: return false
+                val socket = getSocket(device)
                 socketMap[deviceAddress] = socket
             } catch (e: IOException) {
                 //Toast.makeText(context, R.string.toast_6, Toast.LENGTH_SHORT).show();
                 e.printStackTrace()
-                return false
+                throw e
             }
         }
         return true
@@ -168,20 +168,22 @@ class BluetoothController(private val context: Context) {
         return innerPrinterDevice
     }
 
-    fun sendData(bytes: ByteArray, address: String) {
+    fun sendData(bytes: ByteArray, address: String): Boolean {
         val socket = socketMap[address]
-        if (socket != null) {
-            var out: OutputStream?
+        return if (socket != null) {
             try {
                 //val input = socket.inputStream
-                out = socket.outputStream
+                val out = socket.outputStream
                 out.write(bytes, 0, bytes.size)
                 Log.i("BluetoothPrint", "end write ${bytes.size} bytes")
+                true
             } catch (e: IOException) {
                 e.printStackTrace()
+                throw e
             }
         } else {
             Log.i("BluetoothPrint", "bluetoothSocket is null")
+            false
         }
     }
 
